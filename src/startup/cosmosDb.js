@@ -1,5 +1,5 @@
 const { app } = require("@azure/functions");
-const { initializeCosmosDb, getContainer } = require("../startup/cosmosDb");
+const { initializeCosmosDb, getContainer } = require("./cosmosDb");
 
 app.http("users-updateUser", {
   methods: ["PATCH"],
