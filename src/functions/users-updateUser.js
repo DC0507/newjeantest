@@ -6,29 +6,27 @@ app.http("users-updateUser", {
   authLevel: "anonymous",
   route: "users/{userId}",
   handler: async (request, context) => {
-    await initializeCosmosDb();
-
-    let userId = context.bindingData?.userId;
-
-    if (!userId) {
-      const parsedUrl = new URL(request.url);
-      const pathSegments = parsedUrl.pathname.split("/");
-      userId = pathSegments.pop();
-      context.log("Fallback UserId:", userId);
-    }
-
-    context.log("user user userId: ", userId);
-
-    if (!userId) {
-      context.log.error("UserId parameter is missing or undefined.");
-      return {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ error: "UserId is required in the route." }),
-      };
-    }
-
     try {
+      await initializeCosmosDb();
+
+      let userId = context.bindingData?.userId;
+
+      if (!userId) {
+        const parsedUrl = new URL(request.url);
+        const pathSegments = parsedUrl.pathname.split("/");
+        userId = pathSegments.pop();
+        context.log("Fallback UserId:", userId);
+      }
+
+      if (!userId) {
+        context.log.error("UserId parameter is missing or undefined.");
+        return {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ error: "UserId is required in the route." }),
+        };
+      }
+
       const container = getContainer();
 
       // Query to fetch the user
@@ -41,9 +39,7 @@ app.http("users-updateUser", {
       };
 
       const { resources: existingUsers } = await container.items.query(querySpec).fetchAll();
-
-      const existingUser = existingUsers[0]; // Retrieve the first (and only) result
-      context.log("updateUser existingUser: ", existingUser);
+      const existingUser = existingUsers[0];
 
       if (!existingUser) {
         return {
@@ -53,7 +49,7 @@ app.http("users-updateUser", {
         };
       }
 
-      const body = await request.json(); // Parse JSON body
+      const body = await request.json();
       const { name, username, email, userImageUri, followers, following } = body;
 
       // Validate for email and username uniqueness
@@ -69,9 +65,7 @@ app.http("users-updateUser", {
         ],
       };
 
-      const { resources: existingUsersForConflict } = await container.items
-        .query(conflictQuerySpec)
-        .fetchAll();
+      const { resources: existingUsersForConflict } = await container.items.query(conflictQuerySpec).fetchAll();
       const conflictingUser = existingUsersForConflict.find((u) => u.id !== userId);
 
       if (conflictingUser) {
@@ -102,12 +96,8 @@ app.http("users-updateUser", {
         ...(following && { following }),
       };
 
-      context.log("updateUser updatedUser: ", updatedUser);
-
       // Replace the user in the database
-      const { resource: replacedUser } = await container
-        .item(userId, existingUser.type)
-        .replace(updatedUser);
+      const { resource: replacedUser } = await container.item(userId, existingUser.type).replace(updatedUser);
 
       return {
         status: 200,
@@ -115,7 +105,7 @@ app.http("users-updateUser", {
         body: JSON.stringify(replacedUser),
       };
     } catch (error) {
-      context.log("Error updating user:", error.message);
+      context.log.error("Error updating user:", error.message);
       return {
         status: 500,
         headers: { "Content-Type": "application/json" },
